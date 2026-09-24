@@ -10,7 +10,7 @@ enum MentionHighlight {
   everyone,
 }
 
-/// 被 @ 的目标。只有从入口选中的人才会进入 [ChatSendPayload.atUserIds]。
+/// 被 @ 的目标。只有从入口选中的人才会进入 [ChatSendPayload.atUsers]。
 class MentionTarget {
   const MentionTarget({
     required this.userId,
@@ -39,6 +39,13 @@ class MentionTarget {
 
   @override
   int get hashCode => Object.hash(userId, nickname);
+
+  Map<String, dynamic> toJson() {
+    return {
+      'userId': userId,
+      'nickname': nickname,
+    };
+  }
 }
 
 /// 回复快照。发送时固化，原消息删除后公屏引用区仍用这份数据。
@@ -74,26 +81,19 @@ class ReplySnapshot {
   }
 }
 
-/// [sendChatMsg] 入参。手打 `@xxx` 不会出现在 [atUserIds] 里。
+/// [sendChatMsg] 入参。手打 `@xxx` 不会出现在 [atUsers] 里。
 class ChatSendPayload {
   const ChatSendPayload({
     required this.content,
-    required this.atUserIds,
-    this.mentions = const [],
-    this.mentionIndexes = const [],
+    required this.atUsers,
     this.reply,
   });
 
-  /// 正文，不含原子 `@昵称 `。[mentionIndexes] 是它们在正文中的插入位置。
+  /// 观众看到的整句，包含原子 `@昵称 `。
   final String content;
 
-  /// 入口确认过的 userId，顺序与 [mentions] 一致。
-  final List<String> atUserIds;
-
-  final List<MentionTarget> mentions;
-
-  /// [content] 中插入各 `@昵称 ` 的下标，与 [mentions] 一一对应。
-  final List<int> mentionIndexes;
+  /// 入口确认过的用户。
+  final List<MentionTarget> atUsers;
 
   final ReplySnapshot? reply;
 
@@ -101,8 +101,7 @@ class ChatSendPayload {
     return {
       'roomId': ?roomId,
       'content': content,
-      'atUserIds': atUserIds,
-      'mentionIndexes': ? (mentions.isEmpty ? null : mentionIndexes),
+      'atUsers': [for (final user in atUsers) user.toJson()],
       'reply': ?reply?.toJson(),
     };
   }
@@ -115,8 +114,7 @@ class PublicChatMessage {
     required this.senderId,
     required this.senderName,
     required this.content,
-    this.mentions = const [],
-    this.mentionIndexes = const [],
+    this.atUsers = const [],
     this.reply,
     required this.createdAt,
   });
@@ -124,14 +122,15 @@ class PublicChatMessage {
   final String id;
   final String senderId;
   final String senderName;
-  final String content;
-  final List<MentionTarget> mentions;
 
-  /// [content] 中插入各 `@昵称 ` 的下标，与 [mentions] 一一对应。
-  final List<int> mentionIndexes;
+  /// 观众看到的整句，与 [ChatSendPayload.content] 相同。
+  final String content;
+
+  /// 入口确认过的用户，与 [ChatSendPayload.atUsers] 相同。
+  final List<MentionTarget> atUsers;
 
   final ReplySnapshot? reply;
   final DateTime createdAt;
 
-  bool isMentioning(String viewerId) => mentions.any((item) => item.userId == viewerId);
+  bool isMentioning(String viewerId) => atUsers.any((user) => user.userId == viewerId);
 }

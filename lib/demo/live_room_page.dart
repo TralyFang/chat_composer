@@ -72,8 +72,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
   PublicChatMessage _buildMessage({
     required RoomUser sender,
     required String content,
-    List<MentionTarget> mentions = const [],
-    List<int> mentionIndexes = const [],
+    List<MentionTarget> atUsers = const [],
     ReplySnapshot? reply,
   }) {
     _seq += 1;
@@ -82,21 +81,15 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
       senderId: sender.id,
       senderName: sender.nickname,
       content: content,
-      mentions: mentions,
-      mentionIndexes: mentionIndexes,
+      atUsers: atUsers,
       reply: reply,
       createdAt: DateTime.now(),
     );
   }
 
-  void _closeOverlays() {
-    final navigator = Navigator.of(context);
-    if (navigator.canPop()) navigator.pop();
-  }
-
   void _onMention(RoomUser user) {
     if (user.id == _viewerId) return;
-    _composer.enterMention(user.mention, closeOverlays: _closeOverlays);
+    _composer.enterMention(user.mention);
   }
 
   void _onReply(PublicChatMessage message) {
@@ -107,7 +100,6 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         senderName: message.senderName,
         content: message.content,
       ),
-      closeOverlays: _closeOverlays,
     );
   }
 
@@ -117,8 +109,7 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         _buildMessage(
           sender: _me,
           content: payload.content,
-          mentions: payload.mentions,
-          mentionIndexes: payload.mentionIndexes,
+          atUsers: payload.atUsers,
           reply: payload.reply,
         ),
       );
@@ -136,7 +127,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
         return _ProfileCard(
           user: user,
           isSelf: user.id == _viewerId,
-          onAt: () => _onMention(user),
+          onAt: () {
+            Navigator.pop(context);
+            _onMention(user);
+          },
         );
       },
     );
@@ -158,7 +152,10 @@ class _LiveRoomPageState extends State<LiveRoomPage> {
                   '每次仅回复一条，进入后会清草稿',
                   style: TextStyle(color: Color(0x88FFFFFF), fontSize: 12),
                 ),
-                onTap: () => _onReply(message),
+                onTap: () {
+                  Navigator.pop(context);
+                  _onReply(message);
+                },
               ),
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Color(0xFFFF8A80)),

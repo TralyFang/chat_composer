@@ -31,22 +31,22 @@ void main() {
     controller.dispose();
   });
 
-  test('手打 @xxx 不进入 atUserIds', () {
+  test('手打 @xxx 不进入 atUsers', () {
     controller.textController.text = '@夜航主播 你好';
     final payload = controller.buildPayload();
     expect(payload, isNotNull);
-    expect(payload!.atUserIds, isEmpty);
-    expect(payload.mentions, isEmpty);
+    expect(payload!.atUsers, isEmpty);
     expect(payload.content, '@夜航主播 你好');
   });
 
-  test('入口 @ 写入唯一 atUserId，正文不含前缀', () {
+  test('入口 @ 写入用户信息，正文保留可见 @', () {
     controller.enterMention(luna);
     controller.textController.text = '${luna.token}看一下';
     final payload = controller.buildPayload();
-    expect(payload!.atUserIds, ['u_luna']);
-    expect(payload.content, '看一下');
-    expect(payload.toSendChatMsg(roomId: 88)['atUserIds'], ['u_luna']);
+    expect(payload!.atUsers, [luna]);
+    expect(payload.content, '${luna.token}看一下');
+    expect(payload.toSendChatMsg(roomId: 88)['atUsers'], [luna.toJson()]);
+    expect(payload.toSendChatMsg(roomId: 88)['content'], '${luna.token}看一下');
   });
 
   test('默认可同时 @ 多个人', () {
@@ -64,9 +64,10 @@ void main() {
     expect(controller.mentions, [luna, kai]);
     expect(controller.textController.text, '你好${luna.token}${kai.token}在吗');
     final payload = controller.buildPayload()!;
-    expect(payload.atUserIds, ['u_luna', 'u_kai']);
-    expect(payload.content, '你好在吗');
-    expect(payload.mentionIndexes, [2, 2]);
+    expect(payload.atUsers, [luna, kai]);
+    expect(payload.content, '你好${luna.token}${kai.token}在吗');
+    expect(payload.toSendChatMsg()['content'], payload.content);
+    expect(payload.toSendChatMsg()['atUsers'], [luna.toJson(), kai.toJson()]);
   });
 
   test('maxMentions 为 1 时后一次覆盖前一次', () {
@@ -79,7 +80,7 @@ void main() {
       selection: TextSelection.collapsed(offset: kai.token.length + 2),
     );
     expect(single.mentions, [kai]);
-    expect(single.buildPayload()!.atUserIds, ['u_kai']);
+    expect(single.buildPayload()!.atUsers, [kai]);
   });
 
   test('每次仅回复一条，后一次覆盖前一次', () {
@@ -113,9 +114,8 @@ void main() {
     expect(controller.textController.selection.baseOffset, 2);
 
     final payload = controller.buildPayload()!;
-    expect(payload.atUserIds, ['u_luna']);
-    expect(payload.content, '前文你好在吗');
-    expect(payload.mentionIndexes, [4]);
+    expect(payload.atUsers, [luna]);
+    expect(payload.content, '前文你好${luna.token}在吗');
   });
 
   test('光标落进 @ 内部时贴到最近边缘', () {
@@ -152,11 +152,11 @@ void main() {
     );
     expect(controller.mentions, isEmpty);
     expect(controller.textController.text, '你好在吗');
-    expect(controller.buildPayload()!.atUserIds, isEmpty);
+    expect(controller.buildPayload()!.atUsers, isEmpty);
     expect(controller.buildPayload()!.content, '你好在吗');
   });
 
-  test('回删原子 @ 后不再带 atUserIds', () {
+  test('回删原子 @ 后不再带 atUsers', () {
     controller.enterMention(luna);
     controller.textController.value = TextEditingValue(
       text: '${luna.token}hi',
@@ -167,7 +167,7 @@ void main() {
       selection: const TextSelection.collapsed(offset: 0),
     );
     expect(controller.mentions, isEmpty);
-    expect(controller.buildPayload()!.atUserIds, isEmpty);
+    expect(controller.buildPayload()!.atUsers, isEmpty);
     expect(controller.buildPayload()!.content, 'hi');
   });
 
@@ -197,8 +197,15 @@ void main() {
     expect(controller.textController.highlightStyle, style);
   });
 
-  test('正文为空不能发送', () {
-    controller.enterMention(luna);
+  test('正文为空不能发送，只有原子 @ 可以发送', () {
     expect(controller.buildPayload(), isNull);
+    expect(controller.canSend, isFalse);
+
+    controller.enterMention(luna);
+    final payload = controller.buildPayload();
+    expect(payload, isNotNull);
+    expect(payload!.content, '@Luna');
+    expect(payload.atUsers, [luna]);
+    expect(controller.canSend, isTrue);
   });
 }

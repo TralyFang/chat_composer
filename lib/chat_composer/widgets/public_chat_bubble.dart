@@ -85,7 +85,13 @@ class PublicChatBubble extends StatelessWidget {
                               fontSize: 14,
                               height: 1.4,
                             ),
-                            children: _messageSpans(message, viewerId, highlight, highlightStyle),
+                            children: _contentSpans(
+                              message.content,
+                              message.atUsers,
+                              viewerId,
+                              highlight,
+                              highlightStyle,
+                            ),
                           ),
                         ),
                       ],
@@ -101,51 +107,65 @@ class PublicChatBubble extends StatelessWidget {
   }
 }
 
-List<InlineSpan> _messageSpans(
-  PublicChatMessage message,
+List<InlineSpan> _contentSpans(
+  String content,
+  List<MentionTarget> atUsers,
   String viewerId,
   MentionHighlight highlight,
   TextStyle highlightStyle,
 ) {
-  if (message.mentions.isEmpty) {
-    return [TextSpan(text: message.content)];
-  }
   final spans = <InlineSpan>[];
   var cursor = 0;
-  final count = message.mentions.length < message.mentionIndexes.length
-      ? message.mentions.length
-      : message.mentionIndexes.length;
-  for (var i = 0; i < count; i++) {
-    final mention = message.mentions[i];
-    final index = message.mentionIndexes[i].clamp(0, message.content.length);
-    if (index > cursor) {
-      spans.add(TextSpan(text: message.content.substring(cursor, index)));
-      cursor = index;
+  for (final user in atUsers) {
+    final located = _locateToken(content, user.token, cursor);
+    if (located == null) continue;
+    if (located.start > cursor) {
+      spans.add(TextSpan(text: content.substring(cursor, located.start)));
     }
-    final highlightAt = switch (highlight) {
-      MentionHighlight.off => false,
-      MentionHighlight.everyone => true,
-      MentionHighlight.mentioned => mention.userId == viewerId,
-    };
     spans.add(TextSpan(
-      text: mention.token,
-      style: highlight == MentionHighlight.off
-          ? null
-          : highlightAt
-              ? highlightStyle
-              : const TextStyle(
-                  color: Color(0xDEFFFFFF),
-                  fontWeight: FontWeight.w400,
-                ),
+      text: content.substring(located.start, located.end),
+      style: _mentionStyle(user, viewerId, highlight, highlightStyle),
     ));
+    cursor = located.end;
   }
-  if (cursor < message.content.length) {
-    spans.add(TextSpan(text: message.content.substring(cursor)));
+  if (cursor < content.length) {
+    spans.add(TextSpan(text: content.substring(cursor)));
   }
   if (spans.isEmpty) {
-    return [TextSpan(text: message.content)];
+    spans.add(TextSpan(text: content));
   }
   return spans;
+}
+
+/// 在 [content] 的 [cursor] 之后找下一次原子 @。
+///
+/// [token] 形如 `@Luna `，尾部空格用来和后面的正文分开。
+/// 发送时全文会 trim，艾特落在句尾时这个空格会被去掉，只剩 `@Luna`。
+/// 第一种情况按完整 token 匹配；句尾才退回不带空格的写法，避免把中间的普通文字认成艾特。
+({int start, int end})? _locateToken(String content, String token, int cursor) {
+  final index = content.indexOf(token, cursor);
+  if (index >= 0) return (start: index, end: index + token.length);
+  // 句尾被 trim 掉的尾部空格。
+  final bare = token.trimRight();
+  if (bare.length == token.length) return null;
+  final bareIndex = content.indexOf(bare, cursor);
+  if (bareIndex < 0 || bareIndex + bare.length != content.length) return null;
+  return (start: bareIndex, end: content.length);
+}
+
+TextStyle? _mentionStyle(
+  MentionTarget? mention,
+  String viewerId,
+  MentionHighlight highlight,
+  TextStyle highlightStyle,
+) {
+  if (mention == null || highlight == MentionHighlight.off) return null;
+  final highlightAt = highlight == MentionHighlight.everyone || mention.userId == viewerId;
+  if (highlightAt) return highlightStyle;
+  return const TextStyle(
+    color: Color(0xDEFFFFFF),
+    fontWeight: FontWeight.w400,
+  );
 }
 
 class _QuoteBlock extends StatelessWidget {

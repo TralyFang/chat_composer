@@ -48,37 +48,6 @@ class MentionEditingController extends TextEditingController {
 
   String get token => _mentions.isEmpty ? '' : _mentions.first.token;
 
-  /// 去掉原子 @ token 后的正文。
-  String get bodyText {
-    var result = text;
-    for (final mark in _mentions.reversed) {
-      if (!_tokenAt(result, mark.start, mark.token)) continue;
-      result = result.replaceRange(mark.start, mark.end, '');
-    }
-    return result;
-  }
-
-  /// [bodyText] 去掉首尾空白后，每个 @ token 应插入的位置。
-  List<int> get mentionIndexes {
-    final raw = bodyText;
-    final leading = raw.length - raw.trimLeft().length;
-    final contentLength = raw.trim().length;
-    final indexes = <int>[];
-    var removed = 0;
-    for (final mark in _mentions) {
-      final index = mark.start - removed - leading;
-      removed += mark.token.length;
-      if (index < 0) {
-        indexes.add(0);
-      } else if (index > contentLength) {
-        indexes.add(contentLength);
-      } else {
-        indexes.add(index);
-      }
-    }
-    return indexes;
-  }
-
   void insertMention(MentionTarget user) {
     final existing = _mentions.indexWhere((mark) => mark.target.userId == user.userId);
     if (existing >= 0) {
@@ -135,7 +104,11 @@ class MentionEditingController extends TextEditingController {
       onMentionChanged?.call();
       return;
     }
-    final next = bodyText;
+    var next = text;
+    for (final mark in _mentions.reversed) {
+      if (!_tokenAt(next, mark.start, mark.token)) continue;
+      next = next.replaceRange(mark.start, mark.end, '');
+    }
     _mentions.clear();
     _commit(next, 0, notify: true);
   }

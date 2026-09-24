@@ -9,7 +9,7 @@ import 'models.dart';
 /// - 默认可同时 @ 多个人；[maxMentions] 为 1 时仅限一人，后一次覆盖前一次
 /// - 每次仅回复一条
 /// - 入口 @ 插在光标处并保留已输入正文；入口回复仍清草稿
-/// - 手打 `@xxx` 不写进 [ChatSendPayload.atUserIds]
+/// - 手打 `@xxx` 不写进 [ChatSendPayload.atUsers]
 /// - [highlight] 决定艾特高亮对谁生效，[mentionHighlightStyle] 是高亮样式
 class ChatComposerController extends ChangeNotifier {
   ChatComposerController({
@@ -80,11 +80,7 @@ class ChatComposerController extends ChangeNotifier {
   }
 
   /// 长按头像/昵称、资料卡 @ 按钮。
-  void enterMention(
-    MentionTarget user, {
-    VoidCallback? closeOverlays,
-  }) {
-    closeOverlays?.call();
+  void enterMention(MentionTarget user) {
     textController.insertMention(user);
     _requestFocus();
     _refreshCanSend();
@@ -92,11 +88,7 @@ class ChatComposerController extends ChangeNotifier {
   }
 
   /// 长按消息 Reply。每次只挂一条引用快照。
-  void enterReply(
-    ReplySnapshot snapshot, {
-    VoidCallback? closeOverlays,
-  }) {
-    closeOverlays?.call();
+  void enterReply(ReplySnapshot snapshot) {
     resetDraft(notify: false);
     _reply = snapshot;
     _requestFocus();
@@ -119,14 +111,11 @@ class ChatComposerController extends ChangeNotifier {
 
   /// 组装 sendChatMsg 参数。正文为空则返回 null。
   ChatSendPayload? buildPayload() {
-    final content = textController.bodyText.trim();
+    final content = textController.text.trim();
     if (content.isEmpty) return null;
-    final targets = mentions;
     return ChatSendPayload(
       content: content,
-      atUserIds: [for (final target in targets) target.userId],
-      mentions: targets,
-      mentionIndexes: textController.mentionIndexes,
+      atUsers: mentions,
       reply: _reply,
     );
   }
@@ -148,14 +137,14 @@ class ChatComposerController extends ChangeNotifier {
   }
 
   void _onText() {
-    final next = textController.bodyText.trim().isNotEmpty;
+    final next = textController.text.trim().isNotEmpty;
     if (next == _canSend) return;
     _canSend = next;
     notifyListeners();
   }
 
   void _refreshCanSend() {
-    _canSend = textController.bodyText.trim().isNotEmpty;
+    _canSend = textController.text.trim().isNotEmpty;
   }
 
   @override
